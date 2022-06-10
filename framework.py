@@ -29,7 +29,6 @@ parser.add_argument('--config_type', choices=['xml', 'json', 'yaml'], default='y
 
 args = parser.parse_args()
 
-
 """ Data PreProcessing """
 
 """ ------------------ """
