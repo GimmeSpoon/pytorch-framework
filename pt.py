@@ -20,8 +20,8 @@ class NNP:
     def train(self, epoch = 0, loss = 0.):
         self.model.to(self.device)
         self.model.train()
-        for epoch in tqdm(range(epoch, self.epochs), unit='epoch'):
-            for _, (x, y) in enumerate(tqdm(self.trainloader, postfix={'Loss':loss})):
+        for epoch in tqdm(range(epoch, self.epochs), unit='epoch', position=0):
+            for _, (x, y) in enumerate(tqdm(self.trainloader, postfix={'Loss':loss}, leave=False)):
                 x, y = x.to(self.device), y.to(self.device)
                 pred = self.model(x)
                 curloss = self.criterion(pred, y)
@@ -32,6 +32,7 @@ class NNP:
             if epoch == self.checkpoint - 1:
                 self.save(epoch, self.model.state_dict(), self.opt.state_dict(), loss)
             #Visualization
+            self.sch.step()
 
     def infer(self):
         self.model.eval()
