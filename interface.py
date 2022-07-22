@@ -14,9 +14,6 @@ parser.add_argument('--input_path', type=argparse.FileType('r'), metavar='INPUT_
 parser.add_argument('--output_path', type=str, metavar='OUTPUT_PATH')
 parser.add_argument('--checkpoint_path', type=str, metavar='CHECKPOINT_PATH')
 
-# Model structure
-
-
 # Common Hyperparameters
 parser.add_argument('-l', '--lr', type=float, default=0.001, metavar='LEARNING_RATE', help='initial learning rate', dest='learning_rate')
 
@@ -32,7 +29,7 @@ def load_config(path, type):
         parser.exit(message="XML is not supported yet.")
     elif type == 'json':
         config = json.load(config_file)
-    elif type == 'yaml':
+    elif type == 'yaml' or type == 'yml':
         config = yaml.load(config_file, Loader=yaml.SafeLoader)
     return config
 

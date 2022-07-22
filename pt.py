@@ -4,11 +4,11 @@ import torch
 from tqdm import tqdm, trange
 
 class NNP:
-    def __init__(self, model, trainloader, testloader, criterion, opt, hp, sch, checkpoint=50):
+    def __init__(self, model, trainloader, testloader, criterion, opt, hp, sch, checkpoint=50, eval=None):
         self.model = model
         self.trainloader = trainloader
         self.testloader = testloader
-        self.criterion = criterion
+        self.criterion = criterion # Loss Function
         self.opt = opt
         self.hp = hp
         self.sch = sch
@@ -16,13 +16,15 @@ class NNP:
         self.epochs = hp['epochs']
         self.batch_size = hp['batch_size']
         self.device = torch.device(hp['device'])
+        self.eval = eval
+        self.parm = None
         
     def train(self, epoch = 0, loss = 0.):
         last_epoch = epoch
         self.model.to(self.device)
         self.model.train()
-        for epoch in tqdm(range(epoch, self.epochs), unit='epoch', position=0):
-            for i, (x, y) in enumerate(tqdm(self.trainloader, postfix={'Loss':'%.5F'%(loss / self.batch_size)}, leave=False)):
+        for epoch in tqdm(range(epoch, self.epochs), desc='Total', unit='epoch', position=0):
+            for i, (x, y) in enumerate(tqdm(self.trainloader, desc='Batch', postfix={'Loss':'%.5F'%(loss / self.batch_size)}, leave=False)):
                 if i == 0: 
                     loss = 0
                 x, y = x.to(self.device), y.to(self.device)
@@ -33,12 +35,13 @@ class NNP:
                 self.opt.step()
                 loss += curloss.item()
             if epoch % self.checkpoint == self.checkpoint - 1:
-                self.save(epoch+1, self.model.state_dict(), self.opt.state_dict(), loss)
+                self.save(epoch+1, self.model.state_dict(), loss)
             self.sch.step()
         if last_epoch != epoch:
-            self.save(epoch+1, self.model.state_dict(), self.opt.state_dict(), loss)
+            self.save(epoch+1, self.model.state_dict(), loss)
 
     def infer(self):
+        assert eval, "No Evaluation Function" 
         self.model.eval()
         self.model.to(self.device)
         acc = 0.
@@ -52,20 +55,24 @@ class NNP:
                 acc += torch.sum(inferred == y).item()
         acc /= len(self.testloader.dataset)
         print(f"Accuracy : {acc}")
-
     
-    def save(self, epoch, parm, opt, loss, fname='checkpoint_'):
+    def save(self, epoch, parm, loss, fname='checkpoint_'):
         torch.save({
             'epoch': epoch,
             'parm': parm,
-            'opt': opt,
-            'loss':loss
+            'opt': self.opt.state_dict(),
+            'loss': loss,
+            'sch': self.sch.state_dict()
         }, fname+str(epoch)+".pt")
 
     def load(self, path):
         checkpoint = torch.load(path)
         self.model.load_state_dict(checkpoint['parm'])
         self.opt.load_state_dict(checkpoint['opt'])
+        self.sch.load_state_dict(checkpoint['sch'])
         return (checkpoint['epoch'], checkpoint['loss'])
+
+    def set_eval(self, eval):
+        self.eval = eval
 
 
