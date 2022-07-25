@@ -1,10 +1,24 @@
+from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
-import torch
+import torch, torch.utils.data
 from tqdm import tqdm, trange
 
+class HP:
+    def __init__(self, dict:dict):
+        for k, v in dict.items():
+            setattr(self, k, v)
+
+class Eval(ABC):
+    @abstractmethod
+    def eval(pred, y):
+        pass
+    @abstractmethod
+    def total_eval():
+        pass
+
 class NNP:
-    def __init__(self, model, trainloader, testloader, criterion, opt, hp, sch, checkpoint=50, eval=None):
+    def __init__(self, model:torch.nn.Module=None, trainloader:torch.utils.data.DataLoader=None, testloader:torch.utils.data.DataLoader=None, criterion:torch.nn.Module=None, opt:torch.optim.Optimizer=None, hp:HP=None, sch:torch.optim.lr_scheduler._LRScheduler=None, checkpoint=50, save_last=False, eval:Eval=None, device='cuda'):
         self.model = model
         self.trainloader = trainloader
         self.testloader = testloader
@@ -13,9 +27,8 @@ class NNP:
         self.hp = hp
         self.sch = sch
         self.checkpoint = checkpoint
-        self.epochs = hp['epochs']
-        self.batch_size = hp['batch_size']
-        self.device = torch.device(hp['device'])
+        self.save_last = save_last
+        self.device = torch.device(device)
         self.eval = eval
         self.parm = None
         
@@ -23,8 +36,8 @@ class NNP:
         last_epoch = epoch
         self.model.to(self.device)
         self.model.train()
-        for epoch in tqdm(range(epoch, self.epochs), desc='Total', unit='epoch', position=0):
-            for i, (x, y) in enumerate(tqdm(self.trainloader, desc='Batch', postfix={'Loss':'%.5F'%(loss / self.batch_size)}, leave=False)):
+        for epoch in tqdm(range(epoch, self.hp.epochs), desc='Total', unit='epoch', position=0):
+            for i, (x, y) in enumerate(tqdm(self.trainloader, desc='Batch', postfix={'Loss':'%.5F'%(loss / self.hp.batch_size)}, leave=False)):
                 if i == 0: 
                     loss = 0
                 x, y = x.to(self.device), y.to(self.device)
@@ -34,11 +47,15 @@ class NNP:
                 curloss.backward()
                 self.opt.step()
                 loss += curloss.item()
-            if epoch % self.checkpoint == self.checkpoint - 1:
+            if self.save_last:
+                last_epoch = epoch
                 self.save(epoch+1, self.model.state_dict(), loss)
+            elif epoch % self.checkpoint == self.checkpoint - 1:
+                last_epoch = epoch
+                self.save(epoch+1, self.model.state_dict(), loss, f'checkpoint_{epoch+1}.pt')
             self.sch.step()
         if last_epoch != epoch:
-            self.save(epoch+1, self.model.state_dict(), loss)
+            self.save(epoch+1, self.model.state_dict(), loss, f'checkpoint_{epoch+1}.pt')
 
     def infer(self):
         assert eval, "No Evaluation Function" 
@@ -49,21 +66,32 @@ class NNP:
             for x, y in tqdm(self.testloader):
                 x, y = x.to(self.device), y.to(self.device)
                 output = self.model(x)
-                # need to be modified for generalization
-                # current code is for classfier
-                _, inferred = torch.max(output, 1)
-                acc += torch.sum(inferred == y).item()
-        acc /= len(self.testloader.dataset)
-        print(f"Accuracy : {acc}")
-    
-    def save(self, epoch, parm, loss, fname='checkpoint_'):
+                self.eval.eval(output, y)
+                #_, inferred = torch.max(output, 1)
+                #acc += torch.sum(inferred == y).item()
+        #acc /= len(self.testloader.dataset)
+        self.eval.total_eval()
+
+    def validate(self, mode:str)->bool:
+        if mode == 'train':
+            if not self.model or not self.trainloader or not self.criterion or not self.opt or not self.sch or not self.hp or not self.hp.epochs:
+                return False
+            return True
+        elif mode == 'infer':
+            if not self.model or not self.testloader or not self.eval:
+                return False
+            return True
+        else:
+            print(f"mode : {mode} is not defined.")
+
+    def save(self, epoch, parm, loss, fname='last_checkpoint.pt'):
         torch.save({
             'epoch': epoch,
             'parm': parm,
             'opt': self.opt.state_dict(),
             'loss': loss,
             'sch': self.sch.state_dict()
-        }, fname+str(epoch)+".pt")
+        }, fname)
 
     def load(self, path):
         checkpoint = torch.load(path)
@@ -71,8 +99,3 @@ class NNP:
         self.opt.load_state_dict(checkpoint['opt'])
         self.sch.load_state_dict(checkpoint['sch'])
         return (checkpoint['epoch'], checkpoint['loss'])
-
-    def set_eval(self, eval):
-        self.eval = eval
-
-

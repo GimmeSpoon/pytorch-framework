@@ -135,6 +135,7 @@ dmypy.json
 *.yml
 *.yaml
 *.json
+!example.yml
 
 # test files
 test.*

@@ -1,23 +1,23 @@
 import pandas as pd
 import numpy as np
 import torch
+import torch.distributed
 from torch.utils.data import DataLoader
 import torch.optim
 from torch import nn
 from torchvision import datasets, transforms
-from pt import NNP
+from pt import HP, NNP
 from interface import load_config
 import ssl
 
+#CIFAR download error without this
 ssl._create_default_https_context = ssl._create_unverified_context
+
 batch_size = 500
 config = load_config('example.yml', 'yml')
-hp = {
-    'lr' : 0.001,
-    'batch_size' : batch_size,
-    'epochs' : 500,
-    'device' : 'cuda' if torch.cuda.is_available() else 'cpu'
-}
+hp = HP(config.hp)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device_n = torch.cuda.device_count()
 
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 trainset = datasets.CIFAR100(root='./data', train=True, download=True, transform=transform)
@@ -74,9 +74,9 @@ class NN(nn.Module):
 
 model = NN()
 criterion = torch.nn.CrossEntropyLoss()
-opt = torch.optim.SGD(model.parameters(),lr=hp['lr'])
-scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=opt, lr_lambda=lambda epoch:0.95**epoch)
+opt = torch.optim.SGD(model.parameters(),lr=hp.lr)
+scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer=opt, lr_lambda=lambda epoch:hp.ld**epoch)
 
-model = NNP(model=model, trainloader=trainloader, testloader=testloader, criterion=criterion, opt=opt, hp=hp, sch=scheduler, checkpoint=50)
+model = NNP(model=model, trainloader=trainloader, testloader=testloader, criterion=criterion, opt=opt, hp=hp, sch=scheduler, checkpoint=50, device=device)
 model.train()
 model.infer()
