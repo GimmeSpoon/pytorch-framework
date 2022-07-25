@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser(prog="General Machine Learning Framework",
 
 # Basic config
 parser.add_argument('mode', type=str, choices=['train', 'infer'], help='Configure ML types')
+parser.add_argument('-s', '--silent', action='store_true', help='Skip logo if set')
 parser.add_argument('--input_path', type=argparse.FileType('r'), metavar='INPUT_PATH')
 parser.add_argument('--output_path', type=str, metavar='OUTPUT_PATH')
 parser.add_argument('--checkpoint_path', type=str, metavar='CHECKPOINT_PATH')
@@ -29,6 +30,18 @@ parser.add_argument('-l', '--lr', type=float, default=0.001, metavar='LEARNING_R
 # You can also provide config values by file. If file path is passed, hyperparameters before will be ignored.
 parser.add_argument('--config_path', type=str, default='', metavar='CONFIG_PATH')
 parser.add_argument('--config_type', choices=['xml', 'json', 'yaml'], default='yaml', metavar='CONFIG_TYPE')
+
+def logo()->None:
+    print('________                  _________                  ______  ')
+    print('___  __ \___________________  ____/_________  __________  /_ ')
+    print('__  / / /  _ \  _ \__  __ \  /    _  __ \  / / /  ___/_  __ \\')
+    print('_  /_/ //  __/  __/_  /_/ / /___  / /_/ / /_/ // /__ _  / / /')
+    print('/_____/ \___/\___/_  .___/\____/  \____/\__,_/ \___/ /_/ /_/')
+    print('=============================================================')
+    print('DeepCouch - Deep Learning Framework v0.0.1')
+    print('Copyright 2022 Redcated')
+    print('Licensed under the MIT License')
+    print('=============================================================')
 
 def load_config(path, type)->Config:
     """
@@ -64,7 +77,9 @@ if __name__ == "__main__":
     # config file handle here
     if args.config_path:
         config = resolve_config(args=args, config=load_config(path=args.config_path, type=args.config_type))
-    if args.mode == "dl":
+    if not args.silent:
+        logo()
+    if args.mode == "train":
         pass
-    elif args.mode == "dt":
+    elif args.mode == "infer":
         pass
